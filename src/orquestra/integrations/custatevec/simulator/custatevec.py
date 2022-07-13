@@ -1,24 +1,27 @@
 ################################################################################
 # © Copyright 2021-2022 Zapata Computing Inc.
 ################################################################################
+
 import sys
 import warnings
 from typing import Optional
 
 import cirq
 
+from ...cirq.simulator.qsim_simulator import QSimSimulator
+
 try:
     import qsimcirq  # type: ignore
 except ModuleNotFoundError:
     warnings.warn("qsimcirq is not imported")
-from ._base import CirqBasedSimulator
 
 
-class QSimSimulator(CirqBasedSimulator):
-    """Simulator using a qsimcirq simulator which is optimized for GPU
-    using cuStateVec (https://docs.nvidia.com/cuda/cuquantum/custatevec/index.html).
-    Visit https://quantumai.google/qsim to learn more about qsimcirq.
+class CustatevecSimulator(QSimSimulator):
 
+    """CustatevecSimulator is qsimcirq simulator that
+       uses Nvidia GPUs for all simulation. CUDA toolkit and some dependency tools
+       must be installed. The installation guidelines are provided in
+       https://quantumai.google/qsim/tutorials/gcp_gpu.
     Args:
         noise_model: an optional noise model to pass in for noisy simulations
         param_resolver: Optional arg that defines the
@@ -32,13 +35,6 @@ class QSimSimulator(CirqBasedSimulator):
         to use for all circuits run using this simulator. See QSimOptions from
         qsimcirq for more details.
 
-    Attributes:
-        simulator: Qsim simulator this class uses with the options defined.
-        noise_model: an optional noise model to pass in for noisy simulations
-        qubit_order: qubit_order: Optional arg that defines the ordering of qubits.
-        param_resolver: param_resolver: Optional arg that defines the
-        parameters to run with the program.
-        qubit_order: Optional arg that defines the ordering of qubits.
     """
 
     supports_batching = True
@@ -46,7 +42,7 @@ class QSimSimulator(CirqBasedSimulator):
 
     def __init__(
         self,
-        noise_model: cirq.NOISE_MODEL_LIKE = None,
+        noise_model=None,
         param_resolver: Optional[cirq.ParamResolverOrSimilarType] = None,
         qubit_order=cirq.ops.QubitOrder.DEFAULT,
         seed: cirq.RANDOM_STATE_OR_SEED_LIKE = None,
@@ -54,10 +50,17 @@ class QSimSimulator(CirqBasedSimulator):
         qsim_options: Optional["qsimcirq.QSimOptions"] = None,
     ):
 
-        simulator = qsimcirq.QSimSimulator(
-            qsim_options=qsim_options,
+        if qsim_options is None:
+            qsim_options = qsimcirq.QSimOptions(use_gpu=True, gpu_mode=1)
+        else:
+            qsim_options.use_gpu = True
+            qsim_options.gpu_mode = 1
+
+        super().__init__(
+            noise_model=noise_model,
+            param_resolver=param_resolver,
+            qubit_order=qubit_order,
             seed=seed,
             circuit_memoization_size=circuit_memoization_size,
+            qsim_options=qsim_options,
         )
-
-        super().__init__(simulator, noise_model, param_resolver, qubit_order)
